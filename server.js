@@ -5,6 +5,85 @@ import OpenAI from 'openai';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+/* ─────────────────────────────────────────────────────────
+   Deterministic Sorting Engine
+   Never lets the LLM decide order — 100% JS, 100% accurate.
+───────────────────────────────────────────────────────── */
+
+/**
+ * Parse a cell value into the most specific type possible.
+ * Priority: number > date > string
+ */
+function parseValue(raw) {
+  if (raw === null || raw === undefined) return { type: 'string', v: '' };
+  const s = String(raw).trim();
+
+  // Strip common currency / percentage symbols and thousands separators
+  const stripped = s.replace(/[$€£¥₹,]/g, '').replace(/%$/, '').trim();
+
+  // Pure number (int or float, including negatives)
+  if (stripped !== '' && !isNaN(Number(stripped))) {
+    return { type: 'number', v: Number(stripped) };
+  }
+
+  // Date / year patterns
+  const dateAttempt = new Date(s);
+  if (!isNaN(dateAttempt.getTime()) && /\d{4}|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(s)) {
+    return { type: 'date', v: dateAttempt.getTime() };
+  }
+
+  return { type: 'string', v: s.toLowerCase() };
+}
+
+/**
+ * Sort rows by a specific column index.
+ * @param {string[][]} rows
+ * @param {number} colIndex
+ * @param {'asc'|'desc'} direction
+ * @returns {string[][]}
+ */
+function sortRows(rows, colIndex, direction = 'asc') {
+  const dir = direction === 'desc' ? -1 : 1;
+
+  // Determine dominant type for the column (majority wins)
+  const types = rows.map(r => parseValue(r[colIndex]).type);
+  const typeCount = types.reduce((acc, t) => { acc[t] = (acc[t] || 0) + 1; return acc; }, {});
+  const dominantType = Object.entries(typeCount).sort((a, b) => b[1] - a[1])[0][0];
+
+  return [...rows].sort((a, b) => {
+    const av = parseValue(a[colIndex]);
+    const bv = parseValue(b[colIndex]);
+
+    // Empty values always go to the bottom regardless of direction
+    if (a[colIndex] === '' && b[colIndex] !== '') return 1;
+    if (b[colIndex] === '' && a[colIndex] !== '') return -1;
+
+    let cmp = 0;
+    if (dominantType === 'number') {
+      const an = av.type === 'number' ? av.v : parseFloat(String(a[colIndex]).replace(/[$€£¥₹,%,]/g, '')) || 0;
+      const bn = bv.type === 'number' ? bv.v : parseFloat(String(b[colIndex]).replace(/[$€£¥₹,%,]/g, '')) || 0;
+      cmp = an - bn;
+    } else if (dominantType === 'date') {
+      cmp = av.v - bv.v;
+    } else {
+      cmp = String(a[colIndex]).localeCompare(String(b[colIndex]), undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    return cmp * dir;
+  });
+}
+
+/**
+ * Auto-detect the best default sort column.
+ * Prefers a numeric column (salary, age, price, count, year, amount).
+ * Falls back to the first column.
+ */
+function detectDefaultSort(fields) {
+  const numericKeywords = /salary|price|cost|amount|age|year|count|stock|rating|experience|revenue|total|score|rank|number|qty|quantity/i;
+  const idx = fields.findIndex(f => numericKeywords.test(f));
+  return idx >= 0 ? idx : 0;
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -84,10 +163,33 @@ Identify all fields/columns automatically. Extract every record as a row. Return
       throw new Error('Invalid structure returned by AI');
     }
 
-    res.json({ success: true, ...result });
+    // ── Deterministic sort after LLM extraction ──
+    const defaultSortCol = detectDefaultSort(result.fields);
+    const sortedRows = sortRows(result.rows, defaultSortCol, 'asc');
+
+    res.json({
+      success: true,
+      ...result,
+      rows: sortedRows,
+      sortedBy: { colIndex: defaultSortCol, field: result.fields[defaultSortCol], direction: 'asc' },
+    });
   } catch (err) {
     console.error('Structure error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to structure data' });
+  }
+});
+
+// POST /api/sort — re-sort already-structured data (pure JS, no LLM)
+app.post('/api/sort', (req, res) => {
+  try {
+    const { rows, colIndex, direction } = req.body;
+    if (!Array.isArray(rows) || typeof colIndex !== 'number') {
+      return res.status(400).json({ error: 'Invalid sort request' });
+    }
+    const sorted = sortRows(rows, colIndex, direction || 'asc');
+    res.json({ success: true, rows: sorted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -397,6 +397,56 @@ body {
   scrollbar-width: thin; scrollbar-color: var(--border) transparent;
 }
 
+/* ─── Sort Bar ────────────────────────────────────────────────────────────── */
+.sort-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 18px;
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.18);
+  border-radius: var(--radius-sm);
+  animation: fade-up 0.3s var(--ease);
+}
+.sort-label {
+  font-family: var(--font-body); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted);
+  white-space: nowrap;
+}
+.sort-select {
+  font-family: var(--font-body); font-size: 13px; font-weight: 500;
+  padding: 6px 12px; border-radius: var(--radius-xs);
+  background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; outline: none;
+  transition: border-color var(--t) var(--ease);
+}
+.sort-select:focus { border-color: rgba(99,102,241,0.45); }
+.sort-dir-group { display: flex; gap: 0; border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden; }
+.sort-dir {
+  font-family: var(--font-body); font-size: 12px; font-weight: 600;
+  padding: 6px 14px; background: transparent;
+  color: var(--text-muted); border: none; cursor: pointer;
+  transition: all var(--t) var(--ease);
+}
+.sort-dir.active {
+  background: linear-gradient(135deg, var(--indigo), var(--cyan));
+  color: #fff;
+}
+.sort-dir:not(.active):hover { background: var(--surface-hov); color: var(--text); }
+.sort-badge {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--indigo); background: rgba(99,102,241,0.12);
+  padding: 4px 10px; border-radius: 20px;
+  border: 1px solid rgba(99,102,241,0.2);
+  white-space: nowrap; margin-left: auto;
+}
+
+/* Sortable table headers */
+.data-table th[title] {
+  transition: background var(--t) var(--ease), color var(--t) var(--ease);
+}
+.data-table th[title]:hover {
+  background: rgba(99,102,241,0.22); color: #c7d2fe;
+}
+
 /* ─── Explanation ─────────────────────────────────────────────────────────── */
 .explanation-card {
   background: radial-gradient(ellipse at top left, rgba(99,102,241,0.07), transparent 65%), var(--surface);

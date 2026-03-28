@@ -52,11 +52,8 @@ let activeFormat = 'table';
 
 function setFormat(fmt) {
   activeFormat = fmt;
-  // Main tabs
   document.querySelectorAll('.format-tab').forEach(b => b.classList.toggle('active', b.dataset.format === fmt));
-  // Mini tabs
   document.querySelectorAll('.fmt-mini').forEach(b => b.classList.toggle('active', b.dataset.format === fmt));
-  // Show/hide views
   ['table','json','csv'].forEach(f => {
     document.getElementById(`${f}-view`).style.display = f === fmt ? 'block' : 'none';
   });
@@ -70,10 +67,7 @@ function showSection(id) {
   ['loading-section','results-section','error-section'].forEach(s => {
     document.getElementById(s).style.display = 'none';
   });
-  if (id) {
-    const el = document.getElementById(id);
-    el.style.display = id === 'results-section' ? 'flex' : id === 'loading-section' ? 'flex' : 'flex';
-  }
+  if (id) document.getElementById(id).style.display = 'flex';
 }
 
 // ── Loading Steps ──────────────────────────────
@@ -112,19 +106,20 @@ function buildTable(fields, rows) {
   thead.innerHTML = '';
   tbody.innerHTML = '';
 
-  // Header row
   const trh = document.createElement('tr');
   const thIdx = document.createElement('th');
   thIdx.textContent = '#'; thIdx.style.width = '40px';
   trh.appendChild(thIdx);
-  fields.forEach(f => {
+  fields.forEach((f, fi) => {
     const th = document.createElement('th');
     th.textContent = f;
+    th.style.cursor = 'pointer';
+    th.title = `Sort by ${f}`;
+    th.addEventListener('click', () => triggerSort(fi));
     trh.appendChild(th);
   });
   thead.appendChild(trh);
 
-  // Body rows
   rows.forEach((row, ri) => {
     const tr = document.createElement('tr');
     const tdIdx = document.createElement('td');
@@ -161,6 +156,79 @@ function buildCSV(fields, rows) {
 
 // ── State ──────────────────────────────────────
 let currentResult = null;
+let currentSortCol = 0;
+let currentSortDir = 'asc';
+
+// ── Sort Controls ──────────────────────────────
+function populateSortDropdown(fields, defaultColIndex) {
+  const sel = document.getElementById('sort-col');
+  sel.innerHTML = '';
+  fields.forEach((f, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = f;
+    if (i === defaultColIndex) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('sort-bar').style.display = 'flex';
+  updateSortBadge(fields[defaultColIndex], currentSortDir);
+}
+
+function updateSortBadge(fieldName, dir) {
+  const badge = document.getElementById('sort-badge');
+  badge.textContent = `${fieldName} ${dir === 'asc' ? '↑ Low → High' : '↓ High → Low'}`;
+}
+
+async function triggerSort(colIndexOverride) {
+  if (!currentResult) return;
+
+  const sel = document.getElementById('sort-col');
+  const colIndex = colIndexOverride !== undefined ? colIndexOverride : parseInt(sel.value, 10);
+
+  if (colIndexOverride !== undefined) {
+    sel.value = colIndex;
+    // Toggle direction on same-column click
+    currentSortDir = (colIndex === currentSortCol && currentSortDir === 'asc') ? 'desc' : 'asc';
+  }
+
+  currentSortCol = colIndex;
+
+  document.getElementById('sort-asc').classList.toggle('active', currentSortDir === 'asc');
+  document.getElementById('sort-desc').classList.toggle('active', currentSortDir === 'desc');
+
+  try {
+    const resp = await fetch('/api/sort', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: currentResult.rows, colIndex, direction: currentSortDir }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    currentResult.rows = data.rows;
+    buildTable(currentResult.fields, currentResult.rows);
+    buildJSON(currentResult.fields, currentResult.rows);
+    buildCSV(currentResult.fields, currentResult.rows);
+    updateSortBadge(currentResult.fields[colIndex], currentSortDir);
+  } catch (err) {
+    console.error('Sort failed:', err.message);
+  }
+}
+
+// Sort bar events
+document.getElementById('sort-col').addEventListener('change', () => triggerSort());
+document.getElementById('sort-asc').addEventListener('click', () => {
+  currentSortDir = 'asc';
+  document.getElementById('sort-asc').classList.add('active');
+  document.getElementById('sort-desc').classList.remove('active');
+  triggerSort();
+});
+document.getElementById('sort-desc').addEventListener('click', () => {
+  currentSortDir = 'desc';
+  document.getElementById('sort-desc').classList.add('active');
+  document.getElementById('sort-asc').classList.remove('active');
+  triggerSort();
+});
 
 // ── Main: Structure ────────────────────────────
 async function doStructure() {
@@ -193,21 +261,23 @@ async function doStructure() {
     if (!result.fields || !result.rows) throw new Error('Invalid response structure');
 
     currentResult = result;
+    currentSortCol = result.sortedBy?.colIndex ?? 0;
+    currentSortDir = result.sortedBy?.direction ?? 'asc';
 
-    // Render meta
     document.getElementById('dataset-title').textContent = result.title || 'Structured Data';
     document.getElementById('dataset-stats').textContent =
       `${result.rows.length} record${result.rows.length !== 1 ? 's' : ''} · ${result.fields.length} field${result.fields.length !== 1 ? 's' : ''}`;
 
-    // Build all formats
     buildTable(result.fields, result.rows);
     buildJSON(result.fields, result.rows);
     buildCSV(result.fields, result.rows);
 
-    // Default view
+    populateSortDropdown(result.fields, currentSortCol);
+    document.getElementById('sort-asc').classList.toggle('active', currentSortDir === 'asc');
+    document.getElementById('sort-desc').classList.toggle('active', currentSortDir === 'desc');
+
     setFormat(activeFormat);
 
-    // Explanation
     typewrite(document.getElementById('exp-text'), result.explanation || 'Data structured successfully.', 13);
 
     const stepsList = document.getElementById('steps-list');
@@ -234,10 +304,9 @@ async function doStructure() {
 
 // ── Copy ───────────────────────────────────────
 document.getElementById('copy-btn').addEventListener('click', () => {
-  let text = '';
-  if (activeFormat === 'table') text = document.getElementById('csv-output').textContent; // copy as CSV
-  else if (activeFormat === 'json') text = document.getElementById('json-output').textContent;
-  else text = document.getElementById('csv-output').textContent;
+  const text = activeFormat === 'json'
+    ? document.getElementById('json-output').textContent
+    : document.getElementById('csv-output').textContent;
 
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('copy-btn');
@@ -268,17 +337,18 @@ document.getElementById('download-btn').addEventListener('click', () => {
 document.getElementById('reset-btn').addEventListener('click', () => {
   showSection(null);
   document.getElementById('data-input').value = '';
+  document.getElementById('sort-bar').style.display = 'none';
   currentResult = null;
+  currentSortCol = 0;
+  currentSortDir = 'asc';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 // ── Retry ──────────────────────────────────────
 document.getElementById('retry-btn').addEventListener('click', () => showSection(null));
 
-// ── Button ─────────────────────────────────────
+// ── Submit ─────────────────────────────────────
 document.getElementById('struct-btn').addEventListener('click', doStructure);
-
-// Ctrl/Cmd + Enter
 document.getElementById('data-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) doStructure();
 });
