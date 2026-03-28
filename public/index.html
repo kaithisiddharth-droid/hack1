@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Data Sorter — Powered by Qwen</title>
+  <meta name="description" content="Sort any type of data instantly using AI. Paste numbers, names, dates, or JSON objects and get them sorted with explanations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">SortAI</span>
+      <span class="logo-badge">Powered by Qwen</span>
+    </div>
+    <div class="header-tag">Unsorted → Sorted · Instantly</div>
+  </header>
+
+  <main class="main">
+    <!-- Hero -->
+    <section class="hero">
+      <h1 class="hero-title">
+        Sort <span class="gradient-text">Any Data</span><br/>with AI Intelligence
+      </h1>
+      <p class="hero-sub">Paste numbers, names, dates, JSON objects — our AI understands and sorts everything, with full explanations.</p>
+    </section>
+
+    <!-- Input Panel -->
+    <section class="input-panel">
+      <div class="panel-header">
+        <span class="panel-icon">📥</span>
+        <span>Your Unsorted Data</span>
+        <div class="examples-row">
+          <button class="example-btn" data-example="numbers" id="ex-numbers">Numbers</button>
+          <button class="example-btn" data-example="names" id="ex-names">Names</button>
+          <button class="example-btn" data-example="dates" id="ex-dates">Dates</button>
+          <button class="example-btn" data-example="objects" id="ex-objects">JSON Objects</button>
+        </div>
+      </div>
+      <textarea
+        id="data-input"
+        class="data-textarea"
+        placeholder="Paste your unsorted data here…&#10;&#10;Examples:&#10;• 42, 7, 99, 3, 55, 21&#10;• banana, apple, mango, cherry&#10;• [{'name':'Alice','age':30}, {'name':'Bob','age':25}]"
+        rows="7"
+        spellcheck="false"
+      ></textarea>
+
+      <div class="controls">
+        <div class="control-group">
+          <label class="control-label" for="sort-order">Sort Order</label>
+          <div class="toggle-group" id="sort-order">
+            <button class="toggle-btn active" data-value="ascending" id="btn-asc">↑ Ascending</button>
+            <button class="toggle-btn" data-value="descending" id="btn-desc">↓ Descending</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="sort-by-input">Sort By Field <span class="optional">(optional)</span></label>
+          <input type="text" id="sort-by-input" class="sort-by-field" placeholder="e.g. age, name, price" />
+        </div>
+        <button class="sort-btn" id="sort-btn">
+          <span class="sort-btn-icon">✦</span>
+          <span class="sort-btn-text">Sort with AI</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <section class="loading-section" id="loading-section" style="display:none;">
+      <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">AI is analyzing and sorting your data…</div>
+        <div class="loading-steps" id="loading-steps">
+          <div class="loading-step active" id="ls1">🔍 Parsing your data</div>
+          <div class="loading-step" id="ls2">🧠 AI understanding structure</div>
+          <div class="loading-step" id="ls3">⚡ Sorting intelligently</div>
+          <div class="loading-step" id="ls4">✅ Generating explanation</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section class="results-section" id="results-section" style="display:none;">
+      <div class="results-grid">
+        <!-- Before -->
+        <div class="result-card before-card">
+          <div class="card-label">
+            <span class="card-dot red-dot"></span>
+            Before — Unsorted
+          </div>
+          <div class="data-type-badge" id="data-type-badge"></div>
+          <pre class="data-display" id="before-display"></pre>
+        </div>
+
+        <!-- Arrow -->
+        <div class="arrow-divider">
+          <div class="arrow-circle">
+            <span class="arrow-icon">→</span>
+          </div>
+          <div class="arrow-label">AI Sorted</div>
+        </div>
+
+        <!-- After -->
+        <div class="result-card after-card">
+          <div class="card-label">
+            <span class="card-dot green-dot"></span>
+            After — Sorted
+          </div>
+          <button class="copy-btn" id="copy-btn" title="Copy sorted data">Copy</button>
+          <pre class="data-display" id="after-display"></pre>
+        </div>
+      </div>
+
+      <!-- Explanation -->
+      <div class="explanation-card">
+        <div class="exp-header">
+          <span class="exp-icon">🤖</span>
+          <span>AI Explanation</span>
+        </div>
+        <p class="exp-text" id="exp-text"></p>
+        <div class="steps-list" id="steps-list"></div>
+      </div>
+
+      <!-- Sort Again -->
+      <button class="sort-again-btn" id="sort-again-btn">↺ Sort Different Data</button>
+    </section>
+
+    <!-- Error -->
+    <section class="error-section" id="error-section" style="display:none;">
+      <div class="error-card">
+        <div class="error-icon">⚠️</div>
+        <div class="error-msg" id="error-msg">Something went wrong.</div>
+        <button class="retry-btn" id="retry-btn">Try Again</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Built with <span class="heart">♥</span> using <strong>Qwen/Qwen2.5-7B-Instruct</strong> via Featherless AI
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
