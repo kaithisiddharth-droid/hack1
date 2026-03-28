@@ -3,131 +3,157 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Data Sorter — Powered by Qwen</title>
+  <title>StructAI — Unstructured to Structured Data</title>
   <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-  <meta name="description" content="Sort any type of data instantly using AI. Paste numbers, names, dates, or JSON objects and get them sorted with explanations." />
+  <meta name="description" content="Convert any messy, unstructured text into clean structured tables using AI. Paste raw data and get JSON, CSV, or a formatted table instantly." />
+
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
   <div class="particles" id="particles"></div>
 
+  <!-- Header -->
   <header class="header">
     <div class="logo">
-      <div class="logo-icon">⚡</div>
-      <span class="logo-text">SortAI</span>
+      <div class="logo-icon">◈</div>
+      <span class="logo-text">StructAI</span>
       <span class="logo-badge">Powered by Qwen</span>
     </div>
-    <div class="header-tag">Unsorted → Sorted · Instantly</div>
+    <div class="header-tag">Unstructured → Structured · Instantly</div>
   </header>
 
   <main class="main">
+
     <!-- Hero -->
     <section class="hero">
+      <div class="hero-pill">✦ AI-Powered Data Extraction</div>
       <h1 class="hero-title">
-        Sort <span class="gradient-text">Any Data</span><br/>with AI Intelligence
+        Turn <span class="gradient-text">Messy Data</span><br/>Into Clean Structure
       </h1>
-      <p class="hero-sub">Paste numbers, names, dates, JSON objects — our AI understands and sorts everything, with full explanations.</p>
+      <p class="hero-sub">
+        Paste any raw text — emails, notes, CSV drafts, logs, descriptions — and AI instantly extracts a clean, structured table with proper columns and rows.
+      </p>
     </section>
 
     <!-- Input Panel -->
-    <section class="input-panel">
+    <section class="input-panel" id="input-panel">
       <div class="panel-header">
-        <span class="panel-icon">📥</span>
-        <span>Your Unsorted Data</span>
+        <span class="panel-icon">📋</span>
+        <span class="panel-title">Your Unstructured Data</span>
         <div class="examples-row">
-          <button class="example-btn" data-example="numbers" id="ex-numbers">Numbers</button>
-          <button class="example-btn" data-example="names" id="ex-names">Names</button>
-          <button class="example-btn" data-example="dates" id="ex-dates">Dates</button>
-          <button class="example-btn" data-example="objects" id="ex-objects">JSON Objects</button>
+          <button class="example-btn" data-example="people" id="ex-people">People</button>
+          <button class="example-btn" data-example="products" id="ex-products">Products</button>
+          <button class="example-btn" data-example="events" id="ex-events">Events</button>
+          <button class="example-btn" data-example="freetext" id="ex-freetext">Free Text</button>
         </div>
       </div>
+
       <textarea
         id="data-input"
         class="data-textarea"
-        placeholder="Paste your unsorted data here…&#10;&#10;Examples:&#10;• 42, 7, 99, 3, 55, 21&#10;• banana, apple, mango, cherry&#10;• [{'name':'Alice','age':30}, {'name':'Bob','age':25}]"
-        rows="7"
+        placeholder="Paste your unstructured data here…&#10;&#10;Examples:&#10;• John, 28, Engineer, New York, $95,000&#10;• Alice is a 32-year-old designer based in London earning £70,000&#10;• Product: Laptop | Price: $999 | Stock: 45 | Category: Electronics"
+        rows="8"
         spellcheck="false"
       ></textarea>
 
       <div class="controls">
         <div class="control-group">
-          <label class="control-label" for="sort-order">Sort Order</label>
-          <div class="toggle-group" id="sort-order">
-            <button class="toggle-btn active" data-value="ascending" id="btn-asc">↑ Ascending</button>
-            <button class="toggle-btn" data-value="descending" id="btn-desc">↓ Descending</button>
+          <label class="control-label">Output Format</label>
+          <div class="format-tabs" id="format-tabs">
+            <button class="format-tab active" data-format="table" id="fmt-table">
+              <span class="tab-icon">⊞</span> Table
+            </button>
+            <button class="format-tab" data-format="json" id="fmt-json">
+              <span class="tab-icon">{}</span> JSON
+            </button>
+            <button class="format-tab" data-format="csv" id="fmt-csv">
+              <span class="tab-icon">≡</span> CSV
+            </button>
           </div>
         </div>
-        <div class="control-group">
-          <label class="control-label" for="sort-by-input">Sort By Field <span class="optional">(optional)</span></label>
-          <input type="text" id="sort-by-input" class="sort-by-field" placeholder="e.g. age, name, price" />
-        </div>
-        <button class="sort-btn" id="sort-btn">
-          <span class="sort-btn-icon">✦</span>
-          <span class="sort-btn-text">Sort with AI</span>
+
+        <button class="struct-btn" id="struct-btn">
+          <span class="struct-btn-icon">◈</span>
+          <span class="struct-btn-text">Structure with AI</span>
         </button>
       </div>
     </section>
 
-    <!-- Loading State -->
+    <!-- Loading -->
     <section class="loading-section" id="loading-section" style="display:none;">
       <div class="loading-card">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">AI is analyzing and sorting your data…</div>
+        <div class="loading-orb">
+          <div class="orb-ring"></div>
+          <div class="orb-ring orb-ring-2"></div>
+          <div class="orb-core">◈</div>
+        </div>
+        <div class="loading-title">Extracting Structure…</div>
         <div class="loading-steps" id="loading-steps">
-          <div class="loading-step active" id="ls1">🔍 Parsing your data</div>
-          <div class="loading-step" id="ls2">🧠 AI understanding structure</div>
-          <div class="loading-step" id="ls3">⚡ Sorting intelligently</div>
-          <div class="loading-step" id="ls4">✅ Generating explanation</div>
+          <div class="loading-step active" id="ls1">🔍 Reading your data</div>
+          <div class="loading-step" id="ls2">🧠 Identifying fields & patterns</div>
+          <div class="loading-step" id="ls3">⚡ Extracting records</div>
+          <div class="loading-step" id="ls4">✅ Building structured output</div>
         </div>
       </div>
     </section>
 
     <!-- Results -->
     <section class="results-section" id="results-section" style="display:none;">
-      <div class="results-grid">
-        <!-- Before -->
-        <div class="result-card before-card">
-          <div class="card-label">
-            <span class="card-dot red-dot"></span>
-            Before — Unsorted
-          </div>
-          <div class="data-type-badge" id="data-type-badge"></div>
-          <pre class="data-display" id="before-display"></pre>
-        </div>
 
-        <!-- Arrow -->
-        <div class="arrow-divider">
-          <div class="arrow-circle">
-            <span class="arrow-icon">→</span>
-          </div>
-          <div class="arrow-label">AI Sorted</div>
+      <!-- Dataset title + meta row -->
+      <div class="result-meta">
+        <div class="result-meta-left">
+          <div class="dataset-title" id="dataset-title"></div>
+          <div class="dataset-stats" id="dataset-stats"></div>
         </div>
-
-        <!-- After -->
-        <div class="result-card after-card">
-          <div class="card-label">
-            <span class="card-dot green-dot"></span>
-            After — Sorted
+        <div class="result-meta-right">
+          <button class="action-btn" id="copy-btn">⎘ Copy</button>
+          <button class="action-btn" id="download-btn">↓ Download</button>
+          <div class="format-tabs-mini" id="format-tabs-mini">
+            <button class="fmt-mini active" data-format="table" id="mini-table">Table</button>
+            <button class="fmt-mini" data-format="json" id="mini-json">JSON</button>
+            <button class="fmt-mini" data-format="csv" id="mini-csv">CSV</button>
           </div>
-          <button class="copy-btn" id="copy-btn" title="Copy sorted data">Copy</button>
-          <pre class="data-display" id="after-display"></pre>
         </div>
       </div>
 
-      <!-- Explanation -->
+      <!-- Output display area -->
+      <div class="output-card" id="output-card">
+        <!-- Table view -->
+        <div id="table-view" class="output-view">
+          <div class="table-wrap">
+            <table class="data-table" id="data-table">
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- JSON view -->
+        <div id="json-view" class="output-view" style="display:none;">
+          <pre class="code-block" id="json-output"></pre>
+        </div>
+        <!-- CSV view -->
+        <div id="csv-view" class="output-view" style="display:none;">
+          <pre class="code-block" id="csv-output"></pre>
+        </div>
+      </div>
+
+      <!-- AI Explanation -->
       <div class="explanation-card">
         <div class="exp-header">
-          <span class="exp-icon">🤖</span>
-          <span>AI Explanation</span>
+          <div class="exp-icon-wrap">🤖</div>
+          <span class="exp-title">AI Explanation</span>
         </div>
         <p class="exp-text" id="exp-text"></p>
         <div class="steps-list" id="steps-list"></div>
       </div>
 
-      <!-- Sort Again -->
-      <button class="sort-again-btn" id="sort-again-btn">↺ Sort Different Data</button>
+      <button class="reset-btn" id="reset-btn">↺ Structure Different Data</button>
     </section>
 
     <!-- Error -->
@@ -138,6 +164,7 @@
         <button class="retry-btn" id="retry-btn">Try Again</button>
       </div>
     </section>
+
   </main>
 
   <footer class="footer">

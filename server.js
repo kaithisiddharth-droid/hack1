@@ -18,128 +18,53 @@ const openai = new OpenAI({
   apiKey: process.env.FEATHERLESS_API_KEY,
 });
 
-// ── Deterministic JS Sort (always correct) ──────────────────────────────────
-function deterministicSort(arr, sortBy, order) {
-  const desc = order === 'descending';
-  const copy = [...arr];
-
-  copy.sort((a, b) => {
-    let valA = sortBy ? (a?.[sortBy] ?? a) : a;
-    let valB = sortBy ? (b?.[sortBy] ?? b) : b;
-
-    // Date detection
-    const isDate = (v) => typeof v === 'string' && !isNaN(Date.parse(v)) && /[-/]/.test(v);
-    if (isDate(valA) && isDate(valB)) {
-      valA = new Date(valA).getTime();
-      valB = new Date(valB).getTime();
-    }
-
-    // Numeric coercion
-    if (!isNaN(Number(valA)) && !isNaN(Number(valB)) && valA !== '' && valB !== '') {
-      valA = Number(valA);
-      valB = Number(valB);
-    }
-
-    if (typeof valA === 'number' && typeof valB === 'number') {
-      return desc ? valB - valA : valA - valB;
-    }
-
-    const cmp = String(valA).toLowerCase().localeCompare(String(valB).toLowerCase());
-    return desc ? -cmp : cmp;
-  });
-
-  return copy;
-}
-
-// ── Parse raw input string into a JS array ──────────────────────────────────
-function parseData(raw) {
-  const trimmed = raw.trim();
-
-  // JSON array / object
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) return parsed;
-    if (typeof parsed === 'object' && parsed !== null) return [parsed];
-  } catch (_) {}
-
-  // Comma-separated
-  if (trimmed.includes(',')) {
-    return trimmed.split(',').map(s => {
-      const t = s.trim();
-      return t !== '' && !isNaN(Number(t)) ? Number(t) : t;
-    });
+// POST /api/structure — convert unstructured text to structured data using LLM
+app.post('/api/structure', async (req, res) => {
+  const { data } = req.body;
+  if (!data || !data.trim()) {
+    return res.status(400).json({ error: 'No data provided' });
   }
 
-  // Newline-separated
-  if (trimmed.includes('\n')) {
-    return trimmed.split('\n').map(s => {
-      const t = s.trim();
-      return t !== '' && !isNaN(Number(t)) ? Number(t) : t;
-    });
-  }
+  const systemPrompt = `You are a data extraction expert. Your job is to read unstructured or messy text and convert it into clean structured data.
 
-  return [trimmed];
-}
-
-// ── Detect data type label ──────────────────────────────────────────────────
-function detectType(arr, sortBy) {
-  if (!arr.length) return 'unknown';
-  const sample = sortBy ? (arr[0]?.[sortBy] ?? arr[0]) : arr[0];
-  if (typeof sample === 'object' && sample !== null) return 'objects';
-  if (typeof sample === 'number') return 'numbers';
-  if (typeof sample === 'string') {
-    if (!isNaN(Date.parse(sample)) && /[-/]/.test(sample)) return 'dates';
-    if (!isNaN(Number(sample))) return 'numbers';
-  }
-  return 'strings';
-}
-
-// ── POST /api/sort ───────────────────────────────────────────────────────────
-app.post('/api/sort', async (req, res) => {
-  const { data, sortBy, order } = req.body;
-  if (!data) return res.status(400).json({ error: 'No data provided' });
-
-  // Step 1 – Parse reliably with JS
-  let parsed;
-  try {
-    parsed = parseData(data);
-  } catch (e) {
-    return res.status(400).json({ error: 'Could not parse input: ' + e.message });
-  }
-
-  // Step 2 – Sort reliably with JS (no hallucinations)
-  const sorted = deterministicSort(parsed, sortBy || null, order || 'ascending');
-  const dataType = detectType(parsed, sortBy);
-
-  // Step 3 – Ask LLM only for explanation + steps (not for sorting)
-  const systemPrompt = `You are a data analyst assistant. Given information about a sorting operation, return ONLY a JSON object — no markdown, no extra text:
+Return ONLY a valid JSON object in EXACTLY this format — no markdown, no explanation outside the JSON:
 {
-  "explanation": "A clear 2-3 sentence explanation of what the data is and how it was sorted",
-  "steps": ["Step 1: ...", "Step 2: ...", "Step 3: ..."]
-}`;
+  "fields": ["field1", "field2", "field3"],
+  "rows": [
+    ["value1", "value2", "value3"],
+    ["value1", "value2", "value3"]
+  ],
+  "title": "A short title describing the dataset (e.g. 'Employee Records')",
+  "explanation": "2-3 sentences explaining what data was found and how it was structured.",
+  "steps": [
+    "Step 1: ...",
+    "Step 2: ...",
+    "Step 3: ..."
+  ]
+}
 
-  const userPrompt = `A user sorted the following data:
-- Data type: ${dataType}
-- Sort order: ${order || 'ascending'}
-- Sort field: ${sortBy || 'auto-detected'}
-- Input sample (first 5): ${JSON.stringify(parsed.slice(0, 5))}
-- Output sample (first 5): ${JSON.stringify(sorted.slice(0, 5))}
+Rules:
+- fields: array of column header strings (snake_case or Title Case, consistent)
+- rows: 2D array where each inner array corresponds to one record, values aligned with fields
+- All values should be strings
+- If a value is missing for a record, use an empty string ""
+- Detect and normalize data types but keep values as strings
+- title: concise label for the dataset
+- explanation and steps: always include`;
 
-Write a 2-3 sentence explanation and 3 concise steps describing what happened.`;
+  const userPrompt = `Convert the following unstructured data into a structured table:
 
-  let aiMeta = {
-    explanation: `The ${dataType} data (${parsed.length} items) was sorted in ${order || 'ascending'} order.`,
-    steps: [
-      `Step 1: Detected the data as ${dataType}.`,
-      `Step 2: Applied ${order || 'ascending'} sort${sortBy ? ` by "${sortBy}"` : ''}.`,
-      `Step 3: Returned ${sorted.length} correctly ordered items.`,
-    ],
-  };
+"""
+${data.trim()}
+"""
+
+Identify all fields/columns automatically. Extract every record as a row. Return only the JSON.`;
 
   try {
     const completion = await openai.chat.completions.create({
       model: 'Qwen/Qwen2.5-7B-Instruct',
-      max_tokens: 400,
+      max_tokens: 2048,
+      timeout: 25000,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -147,27 +72,25 @@ Write a 2-3 sentence explanation and 3 concise steps describing what happened.`;
     });
 
     const raw = completion.choices[0].message.content.trim();
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) {
-      const parsed2 = JSON.parse(match[0]);
-      if (parsed2.explanation) aiMeta = parsed2;
-    }
-  } catch (err) {
-    console.error('LLM explanation error (non-fatal):', err.message);
-    // aiMeta fallback already set above
-  }
 
-  res.json({
-    success: true,
-    sorted,
-    dataType,
-    sortField: sortBy || null,
-    explanation: aiMeta.explanation,
-    steps: Array.isArray(aiMeta.steps) ? aiMeta.steps : [],
-    original: data,
-  });
+    // Extract JSON from the response (handles markdown code blocks too)
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Could not extract JSON from AI response');
+
+    const result = JSON.parse(jsonMatch[0]);
+
+    // Validate required fields
+    if (!Array.isArray(result.fields) || !Array.isArray(result.rows)) {
+      throw new Error('Invalid structure returned by AI');
+    }
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Structure error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to structure data' });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 AI Data Sorter running at http://localhost:${PORT}\n`);
+  console.log(`\n🚀 StructAI running at http://localhost:${PORT}\n`);
 });
